@@ -1,0 +1,6 @@
+// Copy this file to config.js (same folder) and fill in your real values.
+// config.js is gitignored. This example is a .txt on purpose so clasp
+// does not push it (it would define the same constants twice).
+const TOKEN = "TOKEN_HERE";
+const SHEET_ID = "SHEET_ID_HERE";
+const MAIN_FOLDER_ID = "MAIN_FOLDER_ID_HERE";

@@ -1,0 +1,4 @@
+# real secrets - never commit
+apps-script/config.js
+apps-script/.clasp.json
+local-secrets.txt
