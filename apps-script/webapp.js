@@ -72,6 +72,11 @@ function doPost(e) {
     catch (err) { return out({ error: err.message }); }
   }
 
+  if (d.action === "saveIG") {
+    try { return out(saveIG(d)); }
+    catch (err) { return out({ error: err.message }); }
+  }
+
   const m = d.url.match(/x\.com\/([^\/]+)\/status\/(\d+)/);
   if (!m) return out({ error: "bad url" });
   if (boardNames().indexOf(d.board) < 0) return out({ error: "unknown board" });
@@ -107,6 +112,29 @@ function doPost(e) {
     return out({ error: "download failed: " + err.message });
   }
   return out({ ok: true, saved });
+}
+
+// Instagram: the userscript downloads the image and sends it as base64.
+// "@" button -> "~ <user> on IG.jpg" (scanner puts "<user> on IG" in Description)
+// plain      -> "ig_<imgId>.jpg" (no title, no description, no link)
+function saveIG(d) {
+  if (boardNames().indexOf(d.board) < 0) return { error: "unknown board" };
+  if (!d.data) return { error: "no image data" };
+
+  const user = String(d.user || "").replace(/[^A-Za-z0-9._]/g, "");
+  const id = String(d.img || "img").replace(/[^A-Za-z0-9_-]/g, "");
+  const mime = /^image\/(jpeg|png|webp)$/.test(d.mime) ? d.mime : "image/jpeg";
+  const ext = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" }[mime];
+  const atMode = d.mode === "at";
+  if (atMode && !user) return { error: "no username" };
+
+  const name = atMode ? `~ ${user} on IG.${ext}` : `ig_${id}.${ext}`;
+  const folder = getBoardFolder(d.board);
+  // same-named "@" files are fine (the scanner tracks File IDs); only plain files are de-duplicated
+  if (!atMode && folder.getFilesByName(name).hasNext()) return { ok: true, saved: 0 };
+
+  folder.createFile(Utilities.newBlob(Utilities.base64Decode(d.data), mime, name));
+  return { ok: true, saved: 1 };
 }
 
 function authorize() {
