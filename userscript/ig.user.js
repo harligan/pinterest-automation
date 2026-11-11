@@ -62,6 +62,15 @@ const fetchImage = url => new Promise((res, rej) => GM_xmlhttpRequest({
 
 // ---------- styles ----------
 GM_addStyle(`
+/* no video/reel recommendations in feed, explore or search */
+article:has(video),
+article:has(a[href*="/reel/"]),
+article:has(svg[aria-label="Reels"]),
+article:has(svg[aria-label="Clip"]),
+div:has(> a[href*="/reel/"]),
+div:has(> a[href^="/p/"] svg[aria-label="Clip"]),
+div:has(> a[href^="/p/"] svg[aria-label="Video"]),
+a[href="/reels/"]{display:none !important}
 #pk-tools{position:fixed;z-index:2147483000;display:none;gap:6px}
 .pk-btn{width:30px;height:30px;border-radius:50%;border:0;cursor:pointer;background:rgba(0,0,0,.65);color:#fff;font-size:16px;line-height:30px;padding:0}
 .pk-btn:hover{background:rgba(0,0,0,.85)}
@@ -240,7 +249,9 @@ document.body.appendChild(tools);
 
 const isPostImg = el => {
   if (el.tagName !== "IMG") return false;
-  if (!el.closest('article, [role="dialog"]') || el.closest("header")) return false;
+  const post = el.closest('article, [role="dialog"]');
+  if (!post || el.closest("header")) return false;
+  if (post.querySelector('video, a[href*="/reel/"]')) return false;   // images only
   const r = el.getBoundingClientRect();
   return r.width >= 200 && r.height >= 200;
 };
