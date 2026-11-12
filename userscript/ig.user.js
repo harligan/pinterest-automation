@@ -181,20 +181,49 @@ function bestSrc(img) {
 
 const imgId = url => (new URL(url).pathname.split("/").pop() || "img").replace(/\.\w+$/, "");
 
-const RESERVED = ["p", "reel", "reels", "explore", "stories", "direct", "accounts"];
+const RESERVED = ["p", "reel", "reels", "explore", "stories", "direct", "accounts", "tv", "about",
+  "legal", "web", "directory", "developer", "locations", "tags", "topics", "your_activity", "challenge"];
 
-// username of the post: first profile link in the post header, else the page URL
+// "/name/", "/name", "/name/?hl=en" or an absolute URL -> "name" (query/hash ignored)
+function userFromHref(href) {
+  try {
+    const m = new URL(href, location.origin).pathname.match(/^\/([A-Za-z0-9._]+)\/?$/);
+    return m && !RESERVED.includes(m[1].toLowerCase()) ? m[1] : "";
+  } catch { return ""; }
+}
+
+// avatar alt text: "<name>'s profile picture"
+function userFromAvatar(root) {
+  for (const i of root.querySelectorAll('img[alt*="profile picture"]')) {
+    const m = (i.alt || "").match(/^([A-Za-z0-9._]+)'s profile picture/i);
+    if (m && !RESERVED.includes(m[1].toLowerCase())) return m[1];
+  }
+  return "";
+}
+
+// username of the post. Tries, in order, for the post (article, then dialog):
+// header links -> avatar alt text -> any profile link that is not around the image;
+// finally the page URL (/username/ and /username/p/<id>/).
 function getUser(img) {
-  const root = img.closest("article") || img.closest('[role="dialog"]') || document;
-  const header = root.querySelector("header");
-  if (header) {
-    for (const a of header.querySelectorAll("a[href]")) {
-      const m = (a.getAttribute("href") || "").match(/^\/([A-Za-z0-9._]+)\/$/);
-      if (m && !RESERVED.includes(m[1])) return m[1];
+  const roots = [img.closest("article"), img.closest('[role="dialog"]')].filter(Boolean);
+  for (const root of roots) {
+    const header = root.querySelector("header");
+    if (header) {
+      for (const a of header.querySelectorAll("a[href]")) {
+        const u = userFromHref(a.getAttribute("href") || "");
+        if (u) return u;
+      }
+    }
+    const av = userFromAvatar(root);
+    if (av) return av;
+    for (const a of root.querySelectorAll("a[href]")) {
+      if (a.contains(img)) continue;   // skip the post link and tag links around the photo
+      const u = userFromHref(a.getAttribute("href") || "");
+      if (u) return u;
     }
   }
   const seg = location.pathname.split("/")[1];
-  return seg && !RESERVED.includes(seg) ? seg : "";
+  return seg && !RESERVED.includes(seg.toLowerCase()) ? seg : "";
 }
 
 // ---------- floating buttons (follow the image under the cursor) ----------
@@ -219,7 +248,10 @@ function makeBtn(mode) {
     const img = target;
     if (!img) return;
     const user = getUser(img);
-    if (mode === "at" && !user) return toast("Username not found", true);
+    if (mode === "at" && !user) {
+      console.warn("[pk] username not found, post container:", img.closest('article, [role="dialog"]') || img);
+      return toast("Username not found", true);
+    }
 
     openMenu(b, async board => {
       setState(b, "busy");

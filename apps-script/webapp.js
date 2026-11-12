@@ -114,21 +114,28 @@ function doPost(e) {
   return out({ ok: true, saved });
 }
 
-// Instagram: the userscript downloads the image and sends it as base64.
-// "@" button -> "~ <user> on IG.jpg" (scanner puts "<user> on IG" in Description)
-// plain      -> "ig_<imgId>.jpg" (no title, no description, no link)
+// Instagram / RedNote: the userscript downloads the image and sends it as base64.
+// "@" button -> "~ <user> on IG.jpg" or "~ <user> on RedNote.jpg" (scanner puts the text after "~" in Description)
+// plain      -> "ig_<imgId>.jpg", or "<imgId>.jpg" for RedNote (ids already start with "rn-")
 function saveIG(d) {
   if (boardNames().indexOf(d.board) < 0) return { error: "unknown board" };
   if (!d.data) return { error: "no image data" };
 
-  const user = String(d.user || "").replace(/[^A-Za-z0-9._]/g, "");
+  const rn = d.source === "RedNote";
+  const label = rn ? "RedNote" : "IG";
+  // IG handles are ASCII; RedNote names can be any language, so only strip filename-unsafe characters and "~"
+  const user = rn
+    ? String(d.user || "").replace(/[\\\/:*?"<>|~\x00-\x1f]/g, "").trim().slice(0, 60)
+    : String(d.user || "").replace(/[^A-Za-z0-9._]/g, "");
   const id = String(d.img || "img").replace(/[^A-Za-z0-9_-]/g, "");
   const mime = /^image\/(jpeg|png|webp)$/.test(d.mime) ? d.mime : "image/jpeg";
   const ext = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" }[mime];
   const atMode = d.mode === "at";
   if (atMode && !user) return { error: "no username" };
 
-  const name = atMode ? `~ ${user} on IG.${ext}` : `ig_${id}.${ext}`;
+  const name = atMode
+    ? `~ ${user} on ${label}.${ext}`
+    : (rn ? `${id}.${ext}` : `ig_${id}.${ext}`);
   const folder = getBoardFolder(d.board);
   // same-named "@" files are fine (the scanner tracks File IDs); only plain files are de-duplicated
   if (!atMode && folder.getFilesByName(name).hasNext()) return { ok: true, saved: 0 };
